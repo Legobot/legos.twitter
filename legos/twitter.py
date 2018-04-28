@@ -1,6 +1,8 @@
 from Legobot.Lego import Lego
 import logging
 import re
+import requests
+from bs4 import BeautifulSoup as bs
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +16,6 @@ class TweetExpander(Lego):
                 match = re.search(expr, message['text'])
                 if match is not None:
                     message['twitter_link'] = match.group()
-                    logger.debug('LINK: {}'.format(message['twitter_link']))
                     return True
             except Exception as e:
                 logger.error('''Twitter lego failed to check the message text: 
@@ -23,8 +24,15 @@ class TweetExpander(Lego):
 
     def handle(self, message):
         opts = self.set_opts(message)
+        self.reply(message, self._get_tweet(message['twitter_link']), opts)
 
-        self.reply(message, "That's a twitter.com link.", opts)
+    def _get_tweet(self, twitter_link):
+        url = 'https://publish.twitter.com/oembed?url=' + twitter_link
+        r = requests.get(url)
+        s = bs(r.json()['html'], 'html.parser')
+        s.get_text().replace('\n', '').replace("\'", "'")
+        logger.debug('TWEET TEXT: {}'.format(s))
+        return s.find('p').contents[0]
 
     def set_opts(self, message):
         try:
